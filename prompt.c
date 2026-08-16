@@ -1,3 +1,5 @@
+#include "prompt.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -28,16 +30,14 @@ void format_path(const char *path,const char *shell_home,char *formatted_path, s
 
 }
 
-int main(void){
-
+void display_prompt(const char *shell_home) {
     char hostname[HOST_NAME_MAX];
     char cwd[PATH_MAX];
     char prompt_path[PATH_MAX];
-    char shell_home[PATH_MAX];
 
-    if (getcwd(shell_home, sizeof(shell_home)) == NULL) {
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
         perror("getcwd failed");
-        return 1;
+        return;
     }
     
     struct passwd *pw = getpwuid(getuid());
@@ -47,15 +47,8 @@ int main(void){
         strncpy(hostname, "unknown", sizeof(hostname));
     }
 
-    if (getcwd(cwd, sizeof(cwd)) == NULL) {
-        perror("getcwd failed");
-        return 1;
-    }
-
     format_path(cwd, shell_home, prompt_path, sizeof(prompt_path));
 
     printf("<%s@%s:%s> ", username, hostname, prompt_path);
-
     fflush(stdout);
-    return 0;
 }
