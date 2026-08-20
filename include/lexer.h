@@ -11,7 +11,7 @@ typedef enum {
     OP_LT,         
     OP_GT,         
     OP_GTGT,       
-    EOF,        
+    TOK_EOF,        
     ERROR      
 } TokenType;
 

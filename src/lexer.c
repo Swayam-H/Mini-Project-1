@@ -189,6 +189,6 @@ TokenStream *tokenize(const char *input) {
         token_stream_push(stream, WORD, word_buf);
     }
 
-    token_stream_push(stream, EOF, NULL);
+    token_stream_push(stream, TOK_EOF, NULL);
     return stream;
 }
