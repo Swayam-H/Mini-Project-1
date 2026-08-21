@@ -1,0 +1,12 @@
+
+*.o
+src/*.o
+src/**/*.o
+
+shell.out
+*.out
+
+.vscode/
+.idea/
+*~
+*.swp
