@@ -3,7 +3,7 @@
 src/*.o
 src/**/*.o
 
-shell
+shell.out
 *.out
 
 .vscode/
