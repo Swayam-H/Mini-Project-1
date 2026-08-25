@@ -14,4 +14,6 @@ bool get_prev_cwd(char *dest, size_t size);
 
 int builtin_peek(int argc, char **argv);
 
+int builtin_locate(int argc, char **argv);
+
 #endif 

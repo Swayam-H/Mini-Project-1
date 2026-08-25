@@ -53,6 +53,8 @@ int main(void) {
                 builtin_reveal(argc, argv, shell_home);
             }else if (strcmp(argv[0], "peek") == 0) {
                 builtin_peek(argc, argv);
+            }else if (strcmp(argv[0], "locate") == 0) {
+                builtin_locate(argc, argv);
             }
 
             free(argv);
