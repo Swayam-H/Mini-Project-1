@@ -1,8 +1,7 @@
 #include "prompt.h"
 #include "lexer.h"
 #include "parser.h"
-#include "execute.h"
-
+#include "pipeline.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -29,8 +28,15 @@ int main(void) {
             break;
         }
 
-        if (nread > 0 && line[nread - 1] == '\n') line[nread - 1] = '\0';
-        if (nread > 0 && line[nread - 1] == '\r') line[nread - 1] = '\0';
+        if (nread > 0) {
+            if (line[nread - 1] == '\n') {
+                line[nread - 1] = '\0';
+                nread--;
+            }
+            if (nread > 0 && line[nread - 1] == '\r') {
+                line[nread - 1] = '\0';
+            }
+        }
 
         TokenStream *tokens = tokenize(line);
         if (!tokens || !validate_syntax(tokens)) {

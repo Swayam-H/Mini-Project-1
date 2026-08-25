@@ -81,7 +81,8 @@ static void locate_single_command(const char *name) {
 
 int builtin_locate(int argc, char **argv) {
     if (argc <= 1) {
-        return 0;
+        printf("locate: invalid syntax\n");
+        return -1;
     }
 
     for (int i = 1; i < argc; i++) {

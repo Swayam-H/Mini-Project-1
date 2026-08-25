@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include <sys/types.h>
+
 typedef struct {
     char **argv;
     int argc;
@@ -15,7 +17,6 @@ typedef struct {
     int output_count; 
 } Command;
 
-int execute_single_command(Command *cmd, const char *shell_home);
-int execute_token_stream(const TokenStream *stream, const char *shell_home);
+pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, int pipe_out, bool in_pipeline);
 
 #endif 

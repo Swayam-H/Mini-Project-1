@@ -32,11 +32,11 @@ static void list_directory(const char *dir_path, const char *display_prefix, boo
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
   
-        if (!show_all && entry->d_name[0] == '.') {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
-        if (recursive && (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)) {
+        if (!show_all && entry->d_name[0] == '.') {
             continue;
         }
 
@@ -88,6 +88,10 @@ int builtin_reveal(int argc, char **argv, const char *shell_home) {
         const char *arg = argv[i];
 
         if (arg[0] == '-' && arg[1] != '\0') {
+            if (target_arg != NULL) {
+                printf("reveal: invalid syntax\n");
+                return -1;
+            }
             for (size_t j = 1; arg[j] != '\0'; j++) {
                 if (arg[j] == 'a') {
                     flag_a = true;

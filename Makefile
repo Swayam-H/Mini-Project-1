@@ -11,7 +11,7 @@ SRCS = $(wildcard src/*.c) $(wildcard src/builtins/*.c)
 
 OBJS = $(SRCS:.c=.o)
 
-TARGET = shell.out
+TARGET = shell
 
 all: $(TARGET)
 

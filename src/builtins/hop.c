@@ -59,7 +59,7 @@ static int load_frecency(FrecencyEntry entries[], int max_count) {
         char p[PATH_MAX];
         double c;
         long long t;
-        if (sscanf(line, "%s %lf %lld", p, &c, &t) == 3) {
+        if (sscanf(line, "%lf %lld %[^\n]", &c, &t, p) == 3) {
             strncpy(entries[count].path, p, PATH_MAX - 1);
             entries[count].path[PATH_MAX - 1] = '\0';
             entries[count].count = c;
@@ -79,10 +79,10 @@ static void save_frecency(const FrecencyEntry entries[], int count) {
     if (!fp) return;
 
     for (int i = 0; i < count; i++) {
-        fprintf(fp, "%s %.4f %lld\n", 
-                entries[i].path, 
+        fprintf(fp, "%.4f %lld %s\n", 
                 entries[i].count, 
-                (long long)entries[i].last_visited);
+                (long long)entries[i].last_visited,
+                entries[i].path);
     }
     fclose(fp);
 }
@@ -165,7 +165,7 @@ static int execute_single_hop(const char *arg, const char *shell_home) {
     char target[PATH_MAX];
 
     if (strcmp(arg, "~") == 0) {
-        strncpy(target, shell_home, sizeof(target));
+        snprintf(target, sizeof(target), "%s", shell_home);
     }
     else if (strcmp(arg, ".") == 0) {
         return 0; 

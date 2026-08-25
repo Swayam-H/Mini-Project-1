@@ -203,7 +203,7 @@ static void peek_reverse_seekable(int fd, off_t file_size, bool flag_n) {
         for (ssize_t i = bytes_read - 1; i >= 0; i--) {
             char c = chunk[i];
             if (c == '\n') {
-                if (offset + i == file_size - 1) {
+                if ((off_t)(offset + i) == file_size - 1) {
                     continue;
                 }
 

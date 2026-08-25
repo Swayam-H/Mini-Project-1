@@ -171,67 +171,15 @@ static int setup_input_stream(char **files, size_t count, pid_t *feeder_pid) {
     return pipefd[0];
 }
 
-static bool parse_single_command(const TokenStream *stream, size_t start, size_t end, Command *cmd) {
-    cmd->argc = 0;
-    cmd->argv = malloc((end - start + 1) * sizeof(char *));
-    cmd->input_files = malloc((end - start + 1) * sizeof(char *));
-    cmd->input_count = 0;
-    cmd->output_files = malloc((end - start + 1) * sizeof(char *));
-    cmd->output_modes = malloc((end - start + 1) * sizeof(int));
-    cmd->output_count = 0;
-
-    for (size_t i = start; i < end; i++) {
-        TokenType type = stream->tokens[i].type;
-
-        if (type == WORD) {
-            cmd->argv[cmd->argc++] = stream->tokens[i].value;
-        } else if (type == OP_LT) {
-            i++;
-            if (i < end && stream->tokens[i].type == WORD) {
-                const char *fname = stream->tokens[i].value;
-                int test_fd = open(fname, O_RDONLY);
-                if (test_fd == -1) {
-                    printf("cshell: no such file or directory\n");
-                    free(cmd->argv);
-                    free(cmd->input_files);
-                    free(cmd->output_files);
-                    free(cmd->output_modes);
-                    return false;
-                }
-                close(test_fd);
-                cmd->input_files[cmd->input_count++] = (char *)fname;
-            }
-        } else if (type == OP_GT || type == OP_GTGT) {
-            int is_append = (type == OP_GTGT) ? 1 : 0;
-            i++;
-            if (i < end && stream->tokens[i].type == WORD) {
-                const char *fname = stream->tokens[i].value;
-                int flags = O_WRONLY | O_CREAT | (is_append ? O_APPEND : O_TRUNC);
-                int test_fd = open(fname, flags, 0644);
-                if (test_fd == -1) {
-                    printf("cshell: unable to create file for writing\n");
-                    free(cmd->argv);
-                    free(cmd->input_files);
-                    free(cmd->output_files);
-                    free(cmd->output_modes);
-                    return false;
-                }
-                close(test_fd);
-                cmd->output_files[cmd->output_count] = (char *)fname;
-                cmd->output_modes[cmd->output_count] = is_append;
-                cmd->output_count++;
-            }
-        }
-    }
-
-    cmd->argv[cmd->argc] = NULL;
-    return true;
-}
-
-int execute_single_command(Command *cmd, const char *shell_home) {
+pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, int pipe_out, bool in_pipeline) {
     if (cmd->argc == 0) return 0;
 
+    bool is_bltin = false;
     if (cmd->argv[0][0] != '%' && is_builtin(cmd->argv[0])) {
+        is_bltin = true;
+    }
+
+    if (is_bltin && !in_pipeline) {
         int saved_stdin = -1;
         int saved_stdout = -1;
         pid_t feeder_pid = -1;
@@ -249,7 +197,6 @@ int execute_single_command(Command *cmd, const char *shell_home) {
         if (cmd->output_count > 0) {
             int pipefd[2];
             pipe(pipefd);
-
             tee_pid = fork();
             if (tee_pid == 0) {
                 close(pipefd[1]);
@@ -274,7 +221,7 @@ int execute_single_command(Command *cmd, const char *shell_home) {
             close(pipefd[1]);
         }
 
-        int ret = dispatch_builtin(cmd->argc, cmd->argv, shell_home);
+        dispatch_builtin(cmd->argc, cmd->argv, shell_home);
 
         if (saved_stdin != -1) {
             dup2(saved_stdin, STDIN_FILENO);
@@ -284,51 +231,51 @@ int execute_single_command(Command *cmd, const char *shell_home) {
             dup2(saved_stdout, STDOUT_FILENO);
             close(saved_stdout);
         }
-        if (feeder_pid > 0) {
-            waitpid(feeder_pid, NULL, 0);
-        }
-        if (tee_pid > 0) {
-            waitpid(tee_pid, NULL, 0);
-        }
+        if (feeder_pid > 0) waitpid(feeder_pid, NULL, 0);
+        if (tee_pid > 0) waitpid(tee_pid, NULL, 0);
 
-        return ret;
+        return 0;
     }
 
     char resolved_path[MAX_PATH_BUF];
-    if (!resolve_executable_path(cmd->argv[0], resolved_path, sizeof(resolved_path))) {
-        printf("cshell: command not found (%s)\n", cmd->argv[0]);
-        return -1;
-    }
-
-    char *orig_arg0 = cmd->argv[0];
-    if (cmd->argv[0][0] == '%') {
-        cmd->argv[0] = cmd->argv[0] + 1;
-    }
-
-    pid_t feeder_pid = -1;
-    int in_fd = -1;
-    if (cmd->input_count > 0) {
-        in_fd = setup_input_stream(cmd->input_files, cmd->input_count, &feeder_pid);
+    if (!is_bltin) {
+        if (!resolve_executable_path(cmd->argv[0], resolved_path, sizeof(resolved_path))) {
+            printf("cshell: command not found (%s)\n", cmd->argv[0]);
+            return -1;
+        }
+        if (cmd->argv[0][0] == '%') cmd->argv[0]++;
     }
 
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork failed");
-        if (in_fd >= 0) close(in_fd);
-        cmd->argv[0] = orig_arg0;
         return -1;
     }
 
     if (pid == 0) {
-        if (in_fd >= 0) {
-            dup2(in_fd, STDIN_FILENO);
-            close(in_fd);
+        if (pipe_in != -1) {
+            dup2(pipe_in, STDIN_FILENO);
+            close(pipe_in);
+        }
+        if (pipe_out != -1) {
+            dup2(pipe_out, STDOUT_FILENO);
+            close(pipe_out);
+        }
+
+        if (cmd->input_count > 0) {
+            pid_t feeder_pid = -1;
+            int in_fd = setup_input_stream(cmd->input_files, cmd->input_count, &feeder_pid);
+            if (in_fd >= 0) {
+                dup2(in_fd, STDIN_FILENO);
+                close(in_fd);
+            } else {
+                exit(EXIT_FAILURE);
+            }
         }
 
         if (cmd->output_count > 0) {
             int pipefd[2];
             pipe(pipefd);
-
             pid_t tee = fork();
             if (tee == 0) {
                 close(pipefd[1]);
@@ -352,45 +299,15 @@ int execute_single_command(Command *cmd, const char *shell_home) {
             close(pipefd[1]);
         }
 
-        execv(resolved_path, cmd->argv);
-        perror("execv failed");
-        exit(EXIT_FAILURE);
+        if (is_bltin) {
+            dispatch_builtin(cmd->argc, cmd->argv, shell_home);
+            exit(0);
+        } else {
+            execv(resolved_path, cmd->argv);
+            perror("execv failed");
+            exit(EXIT_FAILURE);
+        }
     }
 
-    if (in_fd >= 0) {
-        close(in_fd);
-    }
-
-    int status = 0;
-    waitpid(pid, &status, 0);
-
-    if (feeder_pid > 0) {
-        waitpid(feeder_pid, NULL, 0);
-    }
-
-    cmd->argv[0] = orig_arg0;
-    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-}
-
-int execute_token_stream(const TokenStream *stream, const char *shell_home) {
-    if (!stream || stream->count <= 1) return 0;
-
-    size_t start = 0;
-    size_t end = 0;
-
-    while (end < stream->count && stream->tokens[end].type != TOK_EOF) {
-        end++;
-    }
-
-    Command cmd;
-    if (parse_single_command(stream, start, end, &cmd)) {
-        int ret = execute_single_command(&cmd, shell_home);
-        free(cmd.argv);
-        free(cmd.input_files);
-        free(cmd.output_files);
-        free(cmd.output_modes);
-        return ret;
-    }
-
-    return -1;
+    return pid;
 }
