@@ -1,13 +1,12 @@
 #include "prompt.h"
 #include "lexer.h"
 #include "parser.h"
-#include "builtins.h"
+#include "execute.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
-#include <string.h>
 
 int main(void) {
     char shell_home[PATH_MAX];
@@ -37,27 +36,8 @@ int main(void) {
         if (!tokens || !validate_syntax(tokens)) {
             printf("cshell: invalid syntax\n");
             fflush(stdout);
-        } else if (tokens->count > 1) { 
-            
-            char **argv = malloc((tokens->count) * sizeof(char *));
-            int argc = 0;
-
-            for (size_t i = 0; i < tokens->count && tokens->tokens[i].type == WORD; i++) {
-                argv[argc++] = tokens->tokens[i].value;
-            }
-            argv[argc] = NULL;
-
-            if (argc > 0 && strcmp(argv[0], "hop") == 0) {
-                builtin_hop(argc, argv, shell_home);
-            }else if (strcmp(argv[0], "reveal") == 0) {
-                builtin_reveal(argc, argv, shell_home);
-            }else if (strcmp(argv[0], "peek") == 0) {
-                builtin_peek(argc, argv);
-            }else if (strcmp(argv[0], "locate") == 0) {
-                builtin_locate(argc, argv);
-            }
-
-            free(argv);
+        } else if (tokens->count > 1) {
+            execute_token_stream(tokens, shell_home);
         }
 
         free_token_stream(tokens);
