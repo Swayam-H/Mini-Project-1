@@ -106,7 +106,12 @@ static bool is_builtin(const char *name) {
     return (strcmp(name, "hop") == 0 ||
             strcmp(name, "reveal") == 0 ||
             strcmp(name, "peek") == 0 ||
-            strcmp(name, "locate") == 0);
+            strcmp(name, "locate") == 0 ||
+            strcmp(name, "activities") == 0 ||
+            strcmp(name, "resume") == 0 ||
+            strcmp(name, "ping") == 0 ||
+            strcmp(name, "spy") == 0 ||
+            strcmp(name, "snoop") == 0);
 }
 
 static int dispatch_builtin(int argc, char **argv, const char *shell_home) {
@@ -114,6 +119,11 @@ static int dispatch_builtin(int argc, char **argv, const char *shell_home) {
     if (strcmp(argv[0], "reveal") == 0) return builtin_reveal(argc, argv, shell_home);
     if (strcmp(argv[0], "peek") == 0) return builtin_peek(argc, argv);
     if (strcmp(argv[0], "locate") == 0) return builtin_locate(argc, argv);
+    if (strcmp(argv[0], "activities") == 0) return builtin_activities(argc, argv);
+    if (strcmp(argv[0], "resume") == 0) return builtin_resume(argc, argv);
+    if (strcmp(argv[0], "ping") == 0) return builtin_ping(argc, argv);
+    if (strcmp(argv[0], "spy") == 0) return builtin_spy(argc, argv);
+    if (strcmp(argv[0], "snoop") == 0) return builtin_snoop(argc, argv);
     return -1;
 }
 
@@ -171,7 +181,7 @@ static int setup_input_stream(char **files, size_t count, pid_t *feeder_pid) {
     return pipefd[0];
 }
 
-pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, int pipe_out, bool in_pipeline) {
+pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, int pipe_out, bool in_pipeline, pid_t pgid, bool is_bg) {
     if (cmd->argc == 0) return 0;
 
     bool is_bltin = false;
@@ -179,7 +189,7 @@ pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, 
         is_bltin = true;
     }
 
-    if (is_bltin && !in_pipeline) {
+    if (is_bltin && !in_pipeline && !is_bg) {
         int saved_stdin = -1;
         int saved_stdout = -1;
         pid_t feeder_pid = -1;
@@ -253,6 +263,9 @@ pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, 
     }
 
     if (pid == 0) {
+        pid_t child_pgid = (pgid == 0) ? getpid() : pgid;
+        setpgid(0, child_pgid);
+
         if (pipe_in != -1) {
             dup2(pipe_in, STDIN_FILENO);
             close(pipe_in);
@@ -270,6 +283,12 @@ pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, 
                 close(in_fd);
             } else {
                 exit(EXIT_FAILURE);
+            }
+        } else if (is_bg && pipe_in == -1) {
+            int devnull = open("/dev/null", O_RDONLY);
+            if (devnull != -1) {
+                dup2(devnull, STDIN_FILENO);
+                close(devnull);
             }
         }
 
@@ -308,6 +327,9 @@ pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, 
             exit(EXIT_FAILURE);
         }
     }
+    
+    pid_t child_pgid = (pgid == 0) ? pid : pgid;
+    setpgid(pid, child_pgid);
 
     return pid;
 }

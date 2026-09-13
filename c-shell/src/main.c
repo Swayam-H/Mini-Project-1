@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
+#include "jobs.h"
+#include "signals.h"
+#include <signal.h>
 
 int main(void) {
     char shell_home[PATH_MAX];
@@ -15,18 +18,34 @@ int main(void) {
         return 1;
     }
 
+    job_table_init();
+    install_shell_signals();
+
     char *line = NULL;
     size_t len = 0;
     ssize_t nread;
+    bool ctrl_d_pending = false;
 
     while (1) {
+        job_report_completed();
         display_prompt(shell_home);
 
         nread = getline(&line, &len, stdin);
         if (nread == -1) {
+           
+            if (job_has_stopped()) {
+                if (!ctrl_d_pending) {
+                    printf("\ncshell: there are stopped jobs\n");
+                    ctrl_d_pending = true;
+                    clearerr(stdin); 
+                    continue;
+                }
+            }
             printf("\n");
             break;
         }
+
+        ctrl_d_pending = false; 
 
         if (nread > 0) {
             if (line[nread - 1] == '\n') {
@@ -47,6 +66,12 @@ int main(void) {
         }
 
         free_token_stream(tokens);
+    }
+
+    for (int i = 0; i < g_job_table.count; i++) {
+        if (g_job_table.jobs[i].active && g_job_table.jobs[i].pgid > 0) {
+            kill(-g_job_table.jobs[i].pgid, SIGHUP);
+        }
     }
 
     free(line);

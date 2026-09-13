@@ -17,6 +17,6 @@ typedef struct {
     int output_count; 
 } Command;
 
-pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, int pipe_out, bool in_pipeline);
+pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, int pipe_out, bool in_pipeline, pid_t pgid, bool is_bg);
 
 #endif 
