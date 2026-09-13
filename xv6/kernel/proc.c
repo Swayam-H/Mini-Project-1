@@ -398,6 +398,8 @@ kexit(int status)
   acquire(&p->lock);
 
   p->xstate = status;
+  p->etime = ticks;
+  if(p->pid > 2) printk("PID %d finished. Turnaround: %d, Wait: %d, Response: %d\n", p->pid, p->etime - p->ctime, (p->etime - p->ctime) - p->rtime, p->first_run_time - p->ctime);
   p->state = ZOMBIE;
 
   release(&wait_lock);
@@ -504,6 +506,32 @@ scheduler(void)
     if (chosen) {
       p = chosen;
       p->state = RUNNING;
+      if(p->first_run_time == 0xFFFFFFFF) p->first_run_time = ticks;
+      c->proc = p;
+      swtch(&c->context, &p->context);
+      mycpu()->intena = 0;
+      c->proc = 0;
+      release(&p->lock);
+    } else {
+      asm volatile("wfi");
+    }
+#elif defined(FIFO)
+    struct proc *earliest = 0;
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE) {
+        if(earliest == 0 || p->ctime < earliest->ctime) {
+          if(earliest) release(&earliest->lock);
+          earliest = p;
+          continue;
+        }
+      }
+      release(&p->lock);
+    }
+    if (earliest) {
+      p = earliest;
+      p->state = RUNNING;
+      if(p->first_run_time == 0xFFFFFFFF) p->first_run_time = ticks;
       c->proc = p;
       swtch(&c->context, &p->context);
       mycpu()->intena = 0;
@@ -521,6 +549,7 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
+      if(p->first_run_time == 0xFFFFFFFF) p->first_run_time = ticks;
         c->proc = p;
         swtch(&c->context, &p->context);
 

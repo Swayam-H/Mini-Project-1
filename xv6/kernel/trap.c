@@ -83,8 +83,9 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if (which_dev == 2) {
-#ifdef MLFQ
     struct proc *p = myproc();
+    if (p) p->rtime++;
+#ifdef MLFQ
     p->ticks_consumed++;
     int limit = (p->queue_level == 0) ? 1 :
                 (p->queue_level == 1) ? 4 :
@@ -100,8 +101,9 @@ usertrap(void)
     if(p->ticks_consumed >= limit || higher_priority_exists) {
       yield();
     }
-#else
+#elif defined(RR)
     yield();
+#elif defined(FIFO)
 #endif
   }
 
@@ -175,8 +177,9 @@ kerneltrap()
 
   // give up the CPU if this is a timer interrupt.
   if (which_dev == 2 && myproc() != 0) {
-#ifdef MLFQ
     struct proc *p = myproc();
+    if (p) p->rtime++;
+#ifdef MLFQ
     p->ticks_consumed++;
     int limit = (p->queue_level == 0) ? 1 :
                 (p->queue_level == 1) ? 4 :
@@ -192,8 +195,9 @@ kerneltrap()
     if(p->ticks_consumed >= limit || higher_priority_exists) {
       yield();
     }
-#else
+#elif defined(RR)
     yield();
+#elif defined(FIFO)
 #endif
   }
 

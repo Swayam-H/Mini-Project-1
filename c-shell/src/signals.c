@@ -14,14 +14,14 @@ void sigtstp_handler(int sig) {
 void install_shell_signals(void) {
     struct sigaction sa;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    if (sa.sa_handler == sigchld_handler) sa.sa_flags = 0;
-
+    
+    sa.sa_flags = 0;
     sa.sa_handler = sigchld_handler;
     sigaction(SIGCHLD, &sa, NULL);
 
     signal(SIGTTOU, SIG_IGN);
 
+    sa.sa_flags = SA_RESTART;
     sa.sa_handler = sigint_handler;
     sigaction(SIGINT, &sa, NULL);
 

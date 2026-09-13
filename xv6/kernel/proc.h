@@ -101,6 +101,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  uint ctime;                  // Creation time
+  uint rtime;                  // Total run time
+  uint etime;                  // End time
+  int first_run_time;
 #ifdef MLFQ
 
   int queue_level;             
@@ -111,7 +115,6 @@ struct proc {
 
   int entry_time;             
 
-  int first_run_time;          
 
   int in_queue;               
 #endif
