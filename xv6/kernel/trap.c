@@ -82,8 +82,28 @@ usertrap(void)
     kexit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if (which_dev == 2)
+  if (which_dev == 2) {
+#ifdef MLFQ
+    struct proc *p = myproc();
+    p->ticks_consumed++;
+    int limit = (p->queue_level == 0) ? 1 :
+                (p->queue_level == 1) ? 4 :
+                (p->queue_level == 2) ? 8 : 16;
+    
+    int higher_priority_exists = 0;
+    for(int q = 0; q < p->queue_level; q++) {
+       if (queue_has_runnable(q)) {
+           higher_priority_exists = 1;
+           break;
+       }
+    }
+    if(p->ticks_consumed >= limit || higher_priority_exists) {
+      yield();
+    }
+#else
     yield();
+#endif
+  }
 
   prepare_return();
 
@@ -154,8 +174,28 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if (which_dev == 2 && myproc() != 0)
+  if (which_dev == 2 && myproc() != 0) {
+#ifdef MLFQ
+    struct proc *p = myproc();
+    p->ticks_consumed++;
+    int limit = (p->queue_level == 0) ? 1 :
+                (p->queue_level == 1) ? 4 :
+                (p->queue_level == 2) ? 8 : 16;
+    
+    int higher_priority_exists = 0;
+    for(int q = 0; q < p->queue_level; q++) {
+       if (queue_has_runnable(q)) {
+           higher_priority_exists = 1;
+           break;
+       }
+    }
+    if(p->ticks_consumed >= limit || higher_priority_exists) {
+      yield();
+    }
+#else
     yield();
+#endif
+  }
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.
@@ -169,6 +209,11 @@ clockintr()
   if (cpuid() == 0) {
     acquire(&tickslock);
     ticks++;
+#ifdef MLFQ
+    if (ticks % 48 == 0) {
+      mlfq_boost();
+    }
+#endif
     wakeup(&ticks);
     release(&tickslock);
   }

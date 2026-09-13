@@ -10,6 +10,30 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
+#ifdef MLFQ
+
+struct proc* mlfq[4][NPROC + 1];
+
+int mlfq_head[4] = {0, 0, 0, 0};
+
+int mlfq_tail[4] = {0, 0, 0, 0};
+
+void enqueue(int queue, struct proc *p) {
+
+  for(int i = mlfq_head[queue]; i < mlfq_tail[queue]; i++) {
+
+    if(mlfq[queue][i % (NPROC + 1)] == p) return;
+
+  }
+
+  mlfq[queue][mlfq_tail[queue] % (NPROC + 1)] = p;
+
+  mlfq_tail[queue]++;
+
+}
+
+#endif
+
 struct proc *initproc;
 
 int nextpid = 1;
@@ -125,6 +149,16 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
+#ifdef MLFQ
+
+  p->queue_level = 0;
+
+  p->ticks_consumed = 0;
+
+  ticks % 48 = 0;
+
+#endif
+
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
     freeproc(p);
@@ -226,6 +260,9 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+#ifdef MLFQ
+  enqueue(p->queue_level, p);
+#endif
 
   release(&p->lock);
 }
@@ -299,6 +336,12 @@ kfork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+#ifdef MLFQ
+  enqueue(np->queue_level, np);
+#endif
+#ifdef MLFQ
+  enqueue(p->queue_level, p);
+#endif
   release(&np->lock);
 
   return pid;
@@ -441,6 +484,35 @@ scheduler(void)
     intr_on();
     intr_off();
 
+#ifdef MLFQ
+    struct proc *chosen = 0;
+    for(int q = 0; q < 4; q++) {
+      while(mlfq_head[q] < mlfq_tail[q]) {
+        struct proc *p_cand = mlfq[q][mlfq_head[q] % (NPROC + 1)];
+        mlfq_head[q]++;
+        
+        acquire(&p_cand->lock);
+        if(p_cand->state == RUNNABLE && p_cand->queue_level == q) {
+          chosen = p_cand;
+          break; 
+        }
+        release(&p_cand->lock);
+      }
+      if (chosen) break;
+    }
+
+    if (chosen) {
+      p = chosen;
+      p->state = RUNNING;
+      c->proc = p;
+      swtch(&c->context, &p->context);
+      mycpu()->intena = 0;
+      c->proc = 0;
+      release(&p->lock);
+    } else {
+      asm volatile("wfi");
+    }
+#else
     int found = 0;
     for (p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
@@ -466,6 +538,7 @@ scheduler(void)
       // nothing to run; stop running on this core until an interrupt.
       asm volatile("wfi");
     }
+#endif
   }
 }
 
@@ -503,6 +576,18 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+#ifdef MLFQ
+  int limit = (p->queue_level == 0) ? 1 :
+              (p->queue_level == 1) ? 4 :
+              (p->queue_level == 2) ? 8 : 16;
+  if (p->ticks_consumed >= limit) {
+    if (p->queue_level < 3) {
+      p->queue_level++;
+    }
+    p->ticks_consumed = 0;
+  }
+  enqueue(p->queue_level, p);
+#endif
   sched();
   release(&p->lock);
 }
@@ -589,6 +674,9 @@ wakeup(void *chan)
       // go to sleep, also set it back to RUNNING.
       if (p->state == SLEEPING) {
         p->state = RUNNABLE;
+#ifdef MLFQ
+  enqueue(p->queue_level, p);
+#endif
       }
     }
     release(&p->lock);
@@ -610,6 +698,9 @@ kkill(int pid)
       if (p->state == SLEEPING) {
         // Wake process from sleep().
         p->state = RUNNABLE;
+#ifdef MLFQ
+  enqueue(p->queue_level, p);
+#endif
       }
       release(&p->lock);
       return 0;
@@ -695,7 +786,41 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
+#ifdef MLFQ
+    printk("%d %s %s q:%d ticks:%d boost_ticks:%d", p->pid, p->name, state, p->queue_level, p->ticks_consumed, ticks % 48);
+#else
     printk("%d %s %s", p->pid, state, p->name);
+#endif
     printk("\n");
   }
 }
+
+#ifdef MLFQ
+void mlfq_boost(void) {
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->state != UNUSED && p->state != ZOMBIE) {
+      p->queue_level = 0;
+      p->ticks_consumed = 0;
+      ticks % 48 = 0;
+      if (p->state == RUNNABLE) {
+          enqueue(0, p);
+      }
+    }
+    release(&p->lock);
+  }
+}
+#endif
+
+#ifdef MLFQ
+int queue_has_runnable(int queue) {
+  for(int i = mlfq_head[queue]; i < mlfq_tail[queue]; i++) {
+    struct proc *p = mlfq[queue][i % (NPROC + 1)];
+    if(p->state == RUNNABLE && p->queue_level == queue) {
+      return 1;
+    }
+  }
+  return 0;
+}
+#endif
