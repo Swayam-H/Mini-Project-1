@@ -250,7 +250,7 @@ pid_t execute_single_command(Command *cmd, const char *shell_home, int pipe_in, 
     char resolved_path[MAX_PATH_BUF];
     if (!is_bltin) {
         if (!resolve_executable_path(cmd->argv[0], resolved_path, sizeof(resolved_path))) {
-            printf("cshell: command not found (%s)\n", cmd->argv[0]);
+            const char *p = cmd->argv[0]; if(p[0]=='%') p++; printf("cshell: command not found (%s)\n", p);
             return -1;
         }
         if (cmd->argv[0][0] == '%') cmd->argv[0]++;

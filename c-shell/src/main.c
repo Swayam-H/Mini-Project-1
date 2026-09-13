@@ -4,6 +4,7 @@
 #include "pipeline.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <unistd.h>
 #include <limits.h>
 #include "jobs.h"
@@ -32,6 +33,7 @@ int main(void) {
 
         nread = getline(&line, &len, stdin);
         if (nread == -1) {
+            if (errno == EINTR) { clearerr(stdin); continue; }
            
             if (job_has_stopped()) {
                 if (!ctrl_d_pending) {

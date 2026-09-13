@@ -155,7 +155,7 @@ found:
 
   p->ticks_consumed = 0;
 
-  ticks % 48 = 0;
+  
 
 #endif
 
@@ -803,7 +803,7 @@ void mlfq_boost(void) {
     if(p->state != UNUSED && p->state != ZOMBIE) {
       p->queue_level = 0;
       p->ticks_consumed = 0;
-      ticks % 48 = 0;
+      
       if (p->state == RUNNABLE) {
           enqueue(0, p);
       }

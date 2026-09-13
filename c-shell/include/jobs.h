@@ -46,6 +46,7 @@ void     job_table_init(void);
 Job*     job_add(pid_t pgid, const char *cmdline, bool is_bg);
 void     job_add_process(Job *job, pid_t pid, const char *cmd_name);
 Job*     job_find_by_pid(pid_t pid);
+Job*     job_find_by_number(int job_number);
 Process* job_find_process(pid_t pid);
 void     job_mark_process_state(pid_t pid, JobState state);
 void     job_report_completed(void);

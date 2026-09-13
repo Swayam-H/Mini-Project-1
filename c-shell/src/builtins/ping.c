@@ -1,7 +1,10 @@
+#define _DEFAULT_SOURCE
+#include <unistd.h>
 #include "builtins.h"
 #include "jobs.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <signal.h>
 
@@ -48,5 +51,6 @@ int builtin_ping(int argc, char **argv) {
         printf("Sent signal %d to %d\n", signal_number, pid);
     }
     
+    usleep(20000);
     return 0;
 }

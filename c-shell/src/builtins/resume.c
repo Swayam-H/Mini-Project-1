@@ -42,7 +42,6 @@ int builtin_resume(int argc, char **argv) {
 
         kill(-job->pgid, SIGCONT);
         
-        job->group_state = JOB_RUNNING;
         for (int p = 0; p < job->proc_count; p++) {
             if (job->procs[p].state == JOB_STOPPED) {
                 job->procs[p].state = JOB_RUNNING;
@@ -71,7 +70,6 @@ int builtin_resume(int argc, char **argv) {
                 if (w > 0) {
                     if (WIFSTOPPED(status)) {
                         job_mark_process_state(w, JOB_STOPPED);
-                        job->group_state = JOB_STOPPED;
                         printf("\n[%d] + Stopped %s\n", job->job_number, job->cmdline);
                         break;
                     } else if (WIFEXITED(status)) {
@@ -99,7 +97,6 @@ int builtin_resume(int argc, char **argv) {
         if (argc > 3) { printf("resume: invalid syntax\n"); return -1; }
 
         kill(-job->pgid, SIGCONT);
-        job->group_state = JOB_RUNNING;
         for (int p = 0; p < job->proc_count; p++) {
             if (job->procs[p].state == JOB_STOPPED) {
                 job->procs[p].state = JOB_RUNNING;

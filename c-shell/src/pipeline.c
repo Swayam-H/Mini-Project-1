@@ -99,7 +99,19 @@ static int execute_pipeline_segment(const TokenStream *stream, size_t start, siz
 
     char cmdline[1024] = {0};
     for (size_t i = start; i < end; i++) {
-        strncat(cmdline, stream->tokens[i].value, sizeof(cmdline) - strlen(cmdline) - 1);
+        const char *val = stream->tokens[i].value;
+        if (!val) {
+            switch(stream->tokens[i].type) {
+                case OP_LT: val = "<"; break;
+                case OP_GT: val = ">"; break;
+                case OP_GTGT: val = ">>"; break;
+                case OP_PIPE: val = "|"; break;
+                case OP_AMP: val = "&"; break;
+                case OP_SEMI: val = ";"; break;
+                default: val = ""; break;
+            }
+        }
+        strncat(cmdline, val, sizeof(cmdline) - strlen(cmdline) - 1);
         if (i < end - 1) strncat(cmdline, " ", sizeof(cmdline) - strlen(cmdline) - 1);
     }
     Job *job = job_add(0, cmdline, is_bg);
@@ -158,7 +170,6 @@ static int execute_pipeline_segment(const TokenStream *stream, size_t start, siz
             pid_t w = waitpid(pids[i], &status, WUNTRACED);
             if (w > 0 && WIFSTOPPED(status)) {
                 if (job) {
-                    job->group_state = JOB_STOPPED;
                     for (int p = 0; p < job->proc_count; p++) {
                         if (job->procs[p].state == JOB_RUNNING) {
                             job->procs[p].state = JOB_STOPPED;

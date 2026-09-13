@@ -103,15 +103,6 @@ struct proc {
   char name[16];               // Process name (debugging)
 #ifdef MLFQ
 
-  int queue_level;
-
-  int ticks_consumed;
-
-  int ticks_since_boost;
-
-#endif
-#ifdef MLFQ
-
   int queue_level;             
 
   int ticks_consumed;        

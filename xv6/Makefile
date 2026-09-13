@@ -61,7 +61,7 @@ OBJCOPY = $(TOOLPREFIX)objcopy
 OBJDUMP = $(TOOLPREFIX)objdump
 
 # Deterministic builds.
-DETFLAGS = -ffile-prefix-map=$(CURDIR)=.
+DETFLAGS = -ffile-prefix-map="$(CURDIR)=."
 
 CFLAGS = -Wall -Werror -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2
 
@@ -150,6 +150,8 @@ UPROGS=\
 	$U/_usertests\
 	$U/_grind\
 	$U/_wc\
+	$U/_schedulertest\
+	$U/_iotest\
 	$U/_zombie\
 	$U/_logstress\
 	$U/_forphan\

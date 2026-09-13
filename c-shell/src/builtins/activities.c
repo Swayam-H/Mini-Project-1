@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 int builtin_activities(int argc, char **argv) {
+    if (argc > 1) { printf("activities: invalid syntax\n"); return -1; }
     (void)argc;
     (void)argv;
 

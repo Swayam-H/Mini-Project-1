@@ -111,6 +111,7 @@ void sigchld_handler(int sig) {
             g_child_changed = 1;
         }
     }
+    job_report_completed();
     errno = saved_errno;
 }
 

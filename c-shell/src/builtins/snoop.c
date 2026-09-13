@@ -45,7 +45,7 @@ static const char* lookup_syscall_name(int num) {
         [53] = "socketpair", [54] = "setsockopt", [55] = "getsockopt",
         [56] = "clone", [57] = "fork", [58] = "vfork", [59] = "execve",
         [60] = "exit", [61] = "wait4", [62] = "kill", [63] = "uname",
-        [231] = "exit_group"
+        [230] = "clock_nanosleep", [231] = "exit_group"
     };
     if (num >= 0 && num < 400 && names[num] != NULL) {
         return names[num];
@@ -117,15 +117,7 @@ int builtin_snoop(int argc, char **argv) {
 
             if (!in_syscall) {
                 current_syscall = regs.orig_rax;
-                clock_gettime(CLOCK_MONOTONIC, &entry_time);
-                in_syscall = true;
-            } else {
-                struct timespec exit_time;
-                clock_gettime(CLOCK_MONOTONIC, &exit_time);
-
-                double elapsed = (exit_time.tv_sec - entry_time.tv_sec) + 
-                                 (exit_time.tv_nsec - entry_time.tv_nsec) / 1e9;
-
+                
                 SyscallStat *s = NULL;
                 for (int i = 0; i < stat_count; i++) {
                     if (stats[i].syscall_num == current_syscall) {
@@ -137,19 +129,37 @@ int builtin_snoop(int argc, char **argv) {
                     s = &stats[stat_count++];
                     s->syscall_num = current_syscall;
                     s->count = 0;
-                    s->total_time = 0;
+                    s->total_time = 0.0;
                     s->first_seen_order = order_counter++;
                 }
                 if (s) {
                     s->count++;
+                }
+                
+                clock_gettime(CLOCK_MONOTONIC, &entry_time);
+                in_syscall = true;
+            } else {
+                struct timespec exit_time;
+                clock_gettime(CLOCK_MONOTONIC, &exit_time);
+                double elapsed = (exit_time.tv_sec - entry_time.tv_sec) + 
+                                 (exit_time.tv_nsec - entry_time.tv_nsec) / 1e9;
+
+                SyscallStat *s = NULL;
+                for (int i = 0; i < stat_count; i++) {
+                    if (stats[i].syscall_num == current_syscall) {
+                        s = &stats[i];
+                        break;
+                    }
+                }
+                if (s) {
                     s->total_time += elapsed;
                 }
-
                 in_syscall = false;
             }
 
             ptrace(PTRACE_SYSCALL, tracee, NULL, NULL);
         }
+
     }
 
     qsort(stats, stat_count, sizeof(SyscallStat), compare_stats);

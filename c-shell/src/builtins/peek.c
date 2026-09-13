@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+static size_t global_line_counter = 0;
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -25,7 +26,7 @@ static void output_line(const char *line, bool flag_n, size_t *line_counter) {
 }
 
 static void peek_forward_stream(int fd, bool flag_n) {
-    size_t line_counter = 0;
+    
     char buffer[CHUNK_SIZE];
     ssize_t bytes_read;
 
@@ -38,7 +39,7 @@ static void peek_forward_stream(int fd, bool flag_n) {
             char c = buffer[i];
             if (c == '\n') {
                 current_line[line_len] = '\0';
-                output_line(current_line, flag_n, &line_counter);
+                output_line(current_line, flag_n, &global_line_counter);
                 line_len = 0;
             } else {
                 if (line_len + 1 >= line_cap) {
@@ -52,7 +53,7 @@ static void peek_forward_stream(int fd, bool flag_n) {
 
     if (line_len > 0) {
         current_line[line_len] = '\0';
-        output_line(current_line, flag_n, &line_counter);
+        output_line(current_line, flag_n, &global_line_counter);
     }
 
     free(current_line);
@@ -301,6 +302,7 @@ static void process_peek_source(const char *filename, bool flag_n, bool flag_r) 
 }
 
 int builtin_peek(int argc, char **argv) {
+    global_line_counter = 0;
     bool flag_n = false;
     bool flag_r = false;
 
